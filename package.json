@@ -1,0 +1,29 @@
+{
+  "name": "webgl-cellular-automata",
+  "version": "1.0.0",
+  "description": "WebGL Cellular Automata",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benpm/webgl-cellular-automata.git"
+  },
+  "author": "Benjamin Mastripolito",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/benpm/webgl-cellular-automata/issues"
+  },
+  "homepage": "https://github.com/benpm/webgl-cellular-automata#readme",
+  "dependencies": {
+    "cash": "latest",
+    "dat.gui": "latest",
+    "lz4js": "latest"
+  },
+  "devDependencies": {
+    "webpack": "^5.6.0",
+    "webpack-cli": "^4.2.0"
+  }
+}

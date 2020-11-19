@@ -1,5 +1,20 @@
 'use strict';
 
+import dat from "dat.gui";
+import lz4 from "lz4js";
+import $ from "cash";
+import "./style.css";
+import colormapCode from "./colormap.glsl";
+import previewCode from "./preview.glsl";
+import vertexCode from "./vertex.glsl";
+import simulateCode from "./simulate.glsl";
+var resources = {
+    "colormap": colormapCode,
+    "preview": previewCode,
+    "vertex": vertexCode,
+    "simulate": simulateCode
+};
+
 const canvas = document.getElementById("glCanvas");
 const gl = canvas.getContext("webgl2");
 const blending = gl.NEAREST;
@@ -8,8 +23,6 @@ const viewerCanvas = document.getElementById("glViewer");
 const glViewer = viewerCanvas.getContext("webgl2");
 
 /* Global Variables */
-var resources = {};                         // Map of resource names to resources such as frag / vert shader
-var resourcesRemaining = 0;                 // Number of remaining resources to fetch
 var flip = false;                           // Framebuffer flip
 var simProgram;                             // The GL shader program for simulation (see simulate.glsl)
 var colorProgram;                           // The GL shader program for colormapping (see colormap.glsl)
@@ -28,12 +41,13 @@ var fbB;                                    // Framebuffer B ID
 var gui;                                    // datgui object
 var touchID;                                // For identifying touch events
 var ruleData = new Uint8Array(1024 * 1024); // The actual CA rule data
+var nStates = 2;                            // Number of states in the CA rule
 
 // Simulation parameters for datgui
 const parameters = {
     clear: clear,
     step: step,
-    newRule: () => { setRule(randomRule(2)); },
+    newRule: () => { setRule(randomRule(nStates)); },
     customRule: () => { alert("not implemented"); },
     mutate: mutate,
     germinate: () => {
@@ -53,6 +67,7 @@ const parameters = {
         }
         webGlSetup(data);
     },
+    nStates: 2,
     penSize: 50.0,
     pause: false,
     scale: 2,
@@ -60,37 +75,37 @@ const parameters = {
 };
 // Preset rules
 const presets = {
-    gol:           [0,0,0,1,0,0,0,0,0, // Converted
+    gol:           [0,0,0,1,0,0,0,0,0,
                     0,0,1,1,0,0,0,0,0],
-    worms:         [0,1,0,0,0,1,0,1,1, // NOT Converted
+    worms:         [0,1,0,0,0,1,0,1,1,
                     0,0,0,0,1,1,1,1,1],
-    maze:          [1,1,0,1,0,0,0,0,1, // NOT Converted
+    maze:          [1,1,0,1,0,0,0,0,1,
                     1,0,1,1,1,0,1,1,0],
-    boxes:         [1,1,0,1,0,0,0,1,1, // NOT Converted
+    boxes:         [1,1,0,1,0,0,0,1,1,
                     0,1,1,1,0,1,0,0,1],
-    hilbert:       [0,1,0,0,0,0,0,0,0, // NOT Converted
+    hilbert:       [0,1,0,0,0,0,0,0,0,
                     0,1,1,1,1,1,1,1,1],
-    snakes:        [0,1,1,1,1,1,1,1,1, // NOT Converted
+    snakes:        [0,1,1,1,1,1,1,1,1,
                     1,1,0,0,1,1,1,0,0],
-    stars:         [0,0,1,1,0,0,1,1,0, // NOT Converted
+    stars:         [0,0,1,1,0,0,1,1,0,
                     0,0,1,1,0,1,1,1,1],
-    nicetiles:     [1,1,1,0,0,0,0,0,1, // NOT Converted
+    nicetiles:     [1,1,1,0,0,0,0,0,1,
                     0,1,1,1,0,1,0,0,1],
-    tricircuit:    [1,1,1,0,0,0,0,0,1, // NOT Converted
+    tricircuit:    [1,1,1,0,0,0,0,0,1,
                     0,1,1,1,1,1,0,0,1],
-    sierpinski1:   [0,1,0,0,0,0,0,0,0, // NOT Converted
+    sierpinski1:   [0,1,0,0,0,0,0,0,0,
                     0,1,1,0,1,1,1,1,1],
-    machine:       [0,1,0,0,0,0,0,0,1, // NOT Converted
+    machine:       [0,1,0,0,0,0,0,0,1,
                     1,1,1,1,0,0,0,1,0],
-    tearing:       [0,0,0,0,1,1,1,1,1, // NOT Converted
+    tearing:       [0,0,0,0,1,1,1,1,1,
                     0,0,0,1,0,1,1,0,1],
-    complexmaze:   [0,0,0,1,0,0,0,0,0, // NOT Converted
+    complexmaze:   [0,0,0,1,0,0,0,0,0,
                     0,0,1,1,1,1,0,1,0],
-    gooeyzebra:    [1,1,1,0,1,1,0,1,1, // NOT Converted
+    gooeyzebra:    [1,1,1,0,1,1,0,1,1,
                     1,1,1,1,0,0,0,0,0],
-    octofractal:   [1,0,0,0,0,1,0,1,1, // NOT Converted
+    octofractal:   [1,0,0,0,0,1,0,1,1,
                     1,1,1,1,0,0,0,1,0],
-    sierpinski2:   [1,1,0,0,0,0,0,0,1, // NOT Converted
+    sierpinski2:   [1,1,0,0,0,0,0,0,1,
                     1,0,1,1,1,0,1,1,0]
 };
 // Mapping from rule length to number of states
@@ -178,7 +193,7 @@ function animateScene() {
 
 //Random rule
 function randomRule(nStates) {
-    let length = maxRuleSubIndex(nStates);
+    let length = ruleLength(nStates);
     let rule = new Uint8Array(length);
     for (let i = 0; i < length; i++) {
         rule[i] = Math.floor(Math.random() * nStates);
@@ -193,22 +208,24 @@ function setRule(rule) {
         alert("invalid rule!");
         return;
     }
-
-    //Rule texture
+    nStates = nStateMap[rule.length];
     ruleData.set(rule);
+    regenRuleTex();
+
+    let ruleString = exportRule(rule);
+    console.info(`rule: [${ruleString}]`);
+    $("#info").text(`rule: [${ruleString}]`);
+}
+
+//Regenerate rule texture from current rule data
+function regenRuleTex() {
+    //Rule texture
     ruleTex = ruleTex || gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, ruleTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 1024, 1024, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, ruleData);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, blending);
-
-    let ruleString = "";
-    for (let r of rule) {
-        ruleString += r + ",";
-    }
-    console.info(`rule: [${ruleString}]`);
-    $("#info").text(`rule: [${ruleString}]`);
 }
 
 //Factorial function
@@ -272,9 +289,48 @@ function ruleSubIndex(nStates, neighbors) {
     return subIndex;
 }
 
-//Returns the maximum rule subindex for given number of states
-function maxRuleSubIndex(nStates) {
-   return nStates * binomial(nStates + 8 - 1, nStates - 1);
+//Returns the number of rule patterns (length of the rule)
+function ruleLength(nStates) {
+   return nStates * ruleSubIndices(nStates);
+}
+
+//Returns the number of rule subindices (pattern permutations)
+function ruleSubIndices(nStates) {
+   return binomial(nStates + 8 - 1, nStates - 1);
+}
+
+//Exports rule to unicode string
+function exportRule(rule) {
+    console.debug(`exporting rule length ${rule.length}`);
+    let string = `${nStateMap[rule.length]}_`;
+    for (let i = 0; i < rule.length; i += 4) {
+        let code = 32;
+        for (let j = 0; j < 4 && i + j < rule.length; j++) {
+            code += rule[i + j] << (j * 4);
+        }
+        string += String.fromCharCode(code);
+    }
+    return string;
+}
+
+//Imports rule from unicode string directly into current rule buffer, setting rule to given
+function importRule(string) {
+    nStates = parseInt(string.split("_")[0]);
+    console.assert(nStates > 1 && nStates < 14, "importRule: incorrect rule length!");
+    let length = ruleLength(nStates);
+    let i = 0;
+    console.debug(`importing rule length ${length}`);
+    string = string.slice(string.indexOf("_") + 1);
+    for (let char of string) {
+        let code = char.charCodeAt(0) - 32;
+        for (let j = 0; j < 4 && i < length; j++) {
+            let value = (code >> j * 4) & 0xF;
+            console.assert(value < nStates, "importRule: rule is invalid!");
+            ruleData[i] = value;
+            i += 1;
+        }
+    }
+    regenRuleTex();
 }
 
 //Setup for WebGL stuff
@@ -437,7 +493,7 @@ function main() {
     }
     //Build nstate map
     for (let i = 2; i <= 14; i++) {
-        nStateMap[maxRuleSubIndex(i)] = i;
+        nStateMap[ruleLength(i)] = i;
     }
 
     //Texture data
@@ -464,18 +520,6 @@ function main() {
     });
 
     animateScene();
-}
-
-//Returns a handler for this resource for onload or similar
-function mapResource(name) {
-    resourcesRemaining += 1;
-    return (data) => {
-        resources[name] = data;
-        resourcesRemaining -= 1;
-        console.info(`${name} loaded, ${resourcesRemaining} remain`);
-        if (resourcesRemaining == 0)
-            main();
-    };
 }
 
 //Compile a shader from given code and gl shader type
@@ -543,9 +587,9 @@ function step() {
 
 //Mutate current rule
 function mutate() {
-    let mRule = [...ruleData];
+    let mRule = ruleData.slice(0, ruleLength(nStates));
     let i = Math.floor(Math.random() * mRule.length);
-    mRule[i] = mRule[i] == 0 ? 1 : 0;
+    mRule[i] = Math.floor(Math.random() * nStates);
     setRule(mRule);
 }
 
@@ -561,6 +605,15 @@ gui.add(parameters, "pause")
     .listen()
     .onChange(() => {if (!parameters.pause) animateScene();});
 gui.add(parameters, "step");
+gui.add(parameters, "nStates").name("# states")
+    .onChange(() => {
+        if (parameters.nStates >= 2 && parameters.nStates < 14) {
+            nStates = parameters.nStates;
+            setRule(randomRule(nStates));
+        } else {
+            parameters.nStates = nStates;
+        }
+    });
 gui.add(parameters, "preset", Object.keys(presets))
     .onChange(() => setRule(presets[parameters.preset]));
 gui.add(parameters, "newRule").name("random rule");
@@ -573,7 +626,6 @@ gui.add(parameters, "fillRandom").name("fill randomly");
 //Load resources
 canvas.width = window.innerWidth / parameters.scale;
 canvas.height = window.innerHeight / parameters.scale;
-$.get("vertex.glsl", mapResource("vertex"));
-$.get("simulate.glsl", mapResource("simulate"));
-$.get("colormap.glsl", mapResource("colormap"));
-$.get("preview.glsl", mapResource("preview"));
+console.debug(colormapCode, previewCode, vertexCode, simulateCode);
+
+main();

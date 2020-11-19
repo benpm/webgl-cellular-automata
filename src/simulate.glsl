@@ -95,24 +95,4 @@ void main(void) {
 
     // Output new state
     gl_FragColor = vec4(vec3(float(newstate) / 255.0), 1.0);
-
-    /* vec2 pSize = vec2(1.0 / uWidth, 1.0 / uHeight);
-    int curstate = get(vTextureCoord);
-    int n = -curstate;
-    for (int x = -1; x <= 1; x += 1) {
-        for (int y = -1; y <= 1; y += 1) {
-            if (get(vTextureCoord + pSize * vec2(x, y)) > 0) {
-                n += 1;
-            }
-        }
-    }
-
-    int newstate = 0;
-    if (curstate == 0 && n == 3) {
-        newstate = 1;
-    } else if (curstate == 1 && (n == 2 || n == 3)) {
-        newstate = 1;
-    }
-
-    gl_FragColor = vec4(vec3(float(newstate) / 255.0), 1.0); */
 }
